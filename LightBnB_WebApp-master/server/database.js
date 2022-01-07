@@ -19,8 +19,8 @@ const pool = new Pool({
  */
  const getUserWithEmail = (email) => {
   return pool
-    .query(`SELECT email FROM users WHERE email LIKE $1;`, [`%${email}%`])
-    .then((result) => result.rows[0] || null)
+    .query(`SELECT * FROM users WHERE email = $1;`, [email])
+    .then((result) => result.rows[0])
     .catch((err) => {
       console.log(err.message);
   });
@@ -34,7 +34,7 @@ exports.getUserWithEmail = getUserWithEmail;
  */
  const getUserWithId = (id) => {
   return pool
-    .query(`SELECT id FROM users WHERE id = $1;`, [`${id}`])
+    .query(`SELECT * FROM users WHERE id = $1;`, [id])
     .then((result) => result.rows[0])
     .catch((err) => {
       console.log(err.message);
@@ -50,7 +50,7 @@ exports.getUserWithId = getUserWithId;
  */
  const addUser = (user) => {
   return pool
-    .query(`INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *;`, [`${user.name}`, `${user.email}`, `${user.password}`])
+    .query(`INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *;`, [user.name, user.email, user.password])
     .then((result) => result.rows[0])
     .catch((err) => {
       console.log(err.message);
@@ -66,8 +66,24 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  return getAllProperties(null, 2);
-}
+  return pool
+  .query(`SELECT properties.*, reservations.*, avg(rating) as average_rating
+  FROM reservations
+  JOIN properties ON reservations.property_id = properties.id
+  JOIN property_reviews ON properties.id = property_reviews.property_id
+  WHERE reservations.guest_id = $1
+  AND reservations.end_date < now()::date
+  GROUP BY properties.id, reservations.id
+  ORDER BY reservations.start_date
+  LIMIT $2;`, [guest_id, limit])
+  .then((result) => {
+    console.log('result-->', result.rows);
+    return result.rows;
+  })
+  .catch((err) => {
+    console.log(err.message);
+  });
+};
 exports.getAllReservations = getAllReservations;
 
 /// Properties
